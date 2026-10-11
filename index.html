@@ -99,6 +99,14 @@
   .tile .ic { font-size: 2.2em; line-height: 1; }
   .tile .hint { font-size: .78em; color: var(--muted); }
   .home-more { margin-top: 14px; }
+  .tgrid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 5px; max-width: 420px; }
+  .tdot { aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--border); background: color-mix(in srgb, var(--green) calc(var(--lvl) * 100%), transparent); }
+  .tstats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+  .tstats div { border: 1px solid var(--border); border-radius: 10px; padding: 8px; text-align: center; }
+  .tstats b { display: block; font-size: 1.4em; }
+  .tstats span { font-size: .78em; color: var(--muted); }
+  #trends .bar > div { background: var(--green); }
+  #trends summary { cursor: pointer; list-style-position: outside; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -312,8 +320,6 @@ function viewToday() {
     ${timer.label ? `<div class="small muted">Working on: ${esc(timer.label)}</div>` : ""}
   </div>`;
 
-  const show = S.daysShowedUp;
-  html += `<div class="muted small" style="text-align:center;margin-top:20px">You've shown up for yourself on ${show} day${show === 1 ? "" : "s"}. That number only goes up. 💛</div>`;
   return html;
 }
 function taskHtml(t) {
@@ -392,6 +398,59 @@ function viewWins() {
   return `<form class="row" id="winForm" autocomplete="off"><input class="grow" name="text" placeholder="Log a win — any size counts (got out of bed? that counts.)" /><button class="primary">Save win</button></form>
     ${S.wins.length ? S.wins.slice(0, 100).map((w) => `<div class="item"><span>🌟</span><span class="grow">${esc(w.text)}</span><span class="muted small">${esc(w.date)}</span></div>`).join("") : `<div class="empty">Wins will collect here automatically as you go.</div>`}`;
 }
+/* ---------- Gentle trends (opt-in, Settings only — no streaks, no "missed") ---------- */
+let trendsOpen = false;
+function dayKey(offset) { const d = new Date(); d.setDate(d.getDate() - offset); const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
+function viewTrends() {
+  const N = 28, days = [...Array(N)].map((_, i) => dayKey(N - 1 - i)), since = days[0];
+  const nonNeg = S.routines.filter((r) => r.essential);
+  const cared = (k) => nonNeg.filter((r) => (S.checks[k] || {})[r.id]).length;
+  const careDays = days.filter((k) => cared(k) > 0).length;
+  const dot = (k) => {
+    const n = cared(k), lvl = nonNeg.length ? n / nonNeg.length : 0;
+    const label = new Date(k + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return `<span class="tdot" style="--lvl:${lvl}" title="${label}${n ? ` · ${n} cared for` : " · rest day"}"></span>`;
+  };
+  const perItem = nonNeg.map((r) => [r, days.filter((k) => (S.checks[k] || {})[r.id]).length]);
+  const recentWins = S.wins.filter((w) => w.date >= since);
+  const bonusWins = recentWins.filter((w) => w.text.startsWith("🎉 Bonus win")).length;
+  const energy = { low: 0, medium: 0, high: 0 };
+  for (const k of days) { const e = S.checkins[k]?.energy; if (e) energy[e]++; }
+  const eTotal = energy.low + energy.medium + energy.high;
+  const joy = S.interests.map((i) => [i, i.sessions.filter((s) => s.date >= since)]).filter(([, s]) => s.length);
+  const growing = S.growth.filter((g) => g.status !== "done" || (g.status === "done" && recentWins.some((w) => w.text === `Completed: ${g.title}`)));
+  const tasksDone = S.tasks.filter((t) => t.done && t.doneAt && t.doneAt.slice(0, 10) >= since).length;
+  const bar = (n, total) => `<div class="bar" style="flex:1"><div style="width:${total ? Math.round((n / total) * 100) : 0}%"></div></div>`;
+
+  return `<div class="card"><details id="trends" ${trendsOpen ? "open" : ""}>
+    <summary><h2 style="display:inline">🌿 Gentle trends</h2> <span class="muted small">· only if you feel like looking</span></summary>
+    <div class="muted small" style="margin:8px 0 12px">No streaks, no scores. Blank days are rest days — they don't count against anything. This is just a mirror for the last 4 weeks.</div>
+
+    <div class="section-label">💛 Caring for yourself</div>
+    <div class="tgrid">${days.map(dot).join("")}</div>
+    <div class="small" style="margin:6px 0 4px">${careDays ? `You looked after a non-negotiable on <b>${careDays}</b> of the last ${N} days. 💛` : "Nothing logged here yet — and that's completely okay. It fills in whenever you check something off."}</div>
+    ${perItem.map(([r, n]) => `<div class="row small" style="gap:8px;margin:3px 0"><span style="width:180px">${esc(r.emoji)} ${esc(r.title)}</span>${bar(n, N)}<span class="muted" style="width:60px;text-align:right">${n} day${n === 1 ? "" : "s"}</span></div>`).join("")}
+
+    <div class="section-label" style="margin-top:14px">🎉 Things to celebrate</div>
+    <div class="tstats">
+      <div><b>${bonusWins}</b><span>bonus wins</span></div>
+      <div><b>${tasksDone}</b><span>one-off things done</span></div>
+      <div><b>${recentWins.length}</b><span>wins logged</span></div>
+      <div><b>${S.daysShowedUp}</b><span>days you've shown up, ever</span></div>
+    </div>
+
+    ${eTotal ? `<div class="section-label" style="margin-top:14px">🔋 Your battery pattern</div>
+      <div class="muted small" style="margin-bottom:4px">Just information — every kind of day is valid.</div>
+      ${[["low", "🪫 Low"], ["medium", "🔋 Okay"], ["high", "⚡ Charged"]].map(([k, l]) => `<div class="row small" style="gap:8px;margin:3px 0"><span style="width:100px">${l}</span>${bar(energy[k], eTotal)}<span class="muted" style="width:60px;text-align:right">${energy[k]} day${energy[k] === 1 ? "" : "s"}</span></div>`).join("")}` : ""}
+
+    ${joy.length ? `<div class="section-label" style="margin-top:14px">🎨 Time for joy</div>
+      ${joy.map(([i, s]) => { const m = s.reduce((a, x) => a + (x.minutes || 0), 0); return `<div class="small" style="margin:3px 0">${esc(i.emoji)} ${esc(i.name)} — ${s.length} session${s.length === 1 ? "" : "s"}${m ? ` · ${m} min` : ""}</div>`; }).join("")}` : ""}
+
+    ${growing.length ? `<div class="section-label" style="margin-top:14px">🌱 Growing</div>
+      ${growing.map((g) => `<div class="row small" style="gap:8px;margin:3px 0"><span style="width:180px">${esc(g.title)}</span>${bar(g.progress, 100)}<span class="muted" style="width:60px;text-align:right">${g.progress}%</span></div>`).join("")}` : ""}
+  </details></div>`;
+}
+
 function viewSettings() {
   const st = S.settings;
   return `<div class="card"><h2>About you</h2>
@@ -402,6 +461,7 @@ function viewSettings() {
       <div class="row" style="margin-top:8px"><span class="muted small">Text size</span>${[[0.9, "A−"], [1, "A"], [1.15, "A+"], [1.3, "A++"]].map(([v, l]) => `<button data-scale="${v}" aria-pressed="${(st.textScale || 1) == v}">${l}</button>`).join("")}</div>
       <div class="row" style="margin-top:8px"><button data-notify>Enable nudges</button><span class="muted small">Optional — gentle pop-ups when a timed reminder arrives (while the app is open).</span></div>
     </div>
+    ${viewTrends()}
     ${viewSync()}
     <div class="card"><h2>Daily reminders</h2>
       <div class="muted small">💛 Non-negotiables get gentle nudges and always show. Everything else is a 🎉 bonus win — never a miss.</div>
@@ -514,6 +574,7 @@ setInterval(() => {
 }, 60000);
 
 /* ---------- Events ---------- */
+document.addEventListener("toggle", (e) => { if (e.target.id === "trends") trendsOpen = e.target.open; }, true);
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   const ds = b.dataset;
