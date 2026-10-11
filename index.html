@@ -350,12 +350,12 @@ function viewSync() {
   if (s.mode === "phone") {
     return `<div class="card"><h2>☁️ Sync with desktop</h2><div>${status}</div>${err}
       <div class="row" style="margin-top:10px">${s.enabled ? `<button class="primary" data-sync-now>Sync now</button><button data-sync-setup>Change connection</button><button class="ghost" data-sync-off>Disconnect</button>` : `<button class="primary" data-sync-setup>Connect</button>`}</div>
-      <div class="muted small" style="margin-top:6px">Your data lives in a private GitHub Gist only you can access. Your token stays on this phone.</div></div>`;
+      <div class="muted small" style="margin-top:6px">Your data lives in a secret (unlisted) GitHub Gist — keep the Sync ID to yourself. Your token stays on this phone.</div></div>`;
   }
   const link = s.gistId && s.appUrl ? `${s.appUrl}#gist=${s.gistId}` : "";
   return `<div class="card"><h2>📱 Phone app &amp; sync</h2><div>${status}</div>${err}
     <div class="row" style="margin-top:10px">${s.enabled ? `<button class="primary" data-sync-now>Sync now</button><button class="ghost" data-sync-off>Turn off</button>` : `<button class="primary" data-sync-on>Turn on sync</button>`}</div>
-    ${link ? `<div class="small" style="margin-top:10px">Open this on your phone, then <b>Share → Add to Home Screen</b>:</div>
+    ${link ? `<div class="small" style="margin-top:10px">Open this on your phone, then <b>Share → Add to Home Screen</b> (keep it private — it contains your Sync ID):</div>
       <div class="row" style="margin-top:4px"><input class="grow" readonly value="${esc(link)}" onclick="this.select()" /><button data-copy="${esc(link)}">Copy</button></div>` : ""}
   </div>`;
 }
