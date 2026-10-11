@@ -24,7 +24,7 @@ export function defaults() {
             r("move", "Move your body for 5 minutes", "🚶", "afternoon"),
             r("tidy", "5-minute tidy reset", "🧺", "evening"),
             r("setout", "Set out things for tomorrow", "🎒", "evening", false, "20:00"),
-            r("winddown", "Start winding down", "🌙", "evening", true, "22:00"),
+            r("winddown", "Start winding down", "🌙", "evening", false, "22:00"),
         ],
         checks: {}, skips: {}, checkins: {}, tasks: [], interests: [], growth: [], inbox: [], wins: [],
     };
@@ -42,6 +42,15 @@ const KIND = [
     "One less thing to hold in your head.",
 ];
 const kind = () => KIND[Math.floor(Math.random() * KIND.length)];
+const CHEER = [
+    "🎉 Bonus win! Look at you go.",
+    "🌟 That one was extra — and you did it anyway!",
+    "🥳 Celebrating this with you!",
+    "✨ A whole bonus win. Be proud of that.",
+    "🎊 Extra credit unlocked. You're amazing.",
+];
+const cheer = () => CHEER[Math.floor(Math.random() * CHEER.length)];
+const bonusText = (r) => `🎉 Bonus win: ${r.emoji} ${r.title}`;
 
 function find(list, itemId, label) {
     const item = list.find((x) => x.id === itemId);
@@ -87,17 +96,20 @@ export function applyOp(d, { op, p }) {
         case "checkin":
             d.checkins[date] = { ...(d.checkins[date] || {}), ...pick(p, ["energy", "mood", "note"]) };
             message = p.energy === "low"
-                ? "Low battery day. Essentials only — everything else can wait, and that's okay."
+                ? "Low battery day. Just the non-negotiables — meds, water, food. Everything else can wait, and that's okay."
                 : "Thanks for checking in with yourself.";
             break;
         case "toggleRoutine": {
             const r = find(d.routines, p.id, "reminder");
             d.checks[date] = d.checks[date] || {};
-            if (!p.done) delete d.checks[date][r.id];
-            else {
+            if (!p.done) {
+                delete d.checks[date][r.id];
+                if (!r.essential) { const i = d.wins.findIndex((w) => w.date === date && w.text === bonusText(r)); if (i >= 0) d.wins.splice(i, 1); }
+            } else {
                 d.checks[date][r.id] = at;
                 if (d.skips[date]) delete d.skips[date][r.id];
-                message = kind();
+                if (r.essential) message = kind();
+                else { addWin(d, bonusText(r), at); message = cheer(); }
             }
             break;
         }
@@ -261,14 +273,14 @@ export function summary(d, date = today()) {
     return {
         date,
         checkin: d.checkins[date] || null,
-        reminders: active.map((r) => ({ id: r.id, title: r.title, time: r.time, part: r.part, essential: r.essential, done: !!checks[r.id], skipped: !!skips[r.id] })),
+        reminders: active.map((r) => ({ id: r.id, title: r.title, time: r.time, part: r.part, nonNegotiable: r.essential, done: !!checks[r.id], skipped: !!skips[r.id] })),
         tasks: d.tasks.filter((t) => !t.done).map((t) => ({ id: t.id, title: t.title, date: t.date, steps: t.steps })),
         interests: d.interests.map((i) => ({ id: i.id, name: i.name, status: i.status, nextStep: i.nextStep, lastTouched: i.sessions[0]?.date || null })),
         growth: d.growth.map((g) => ({ id: g.id, title: g.title, type: g.type, status: g.status, progress: g.progress, nextStep: g.nextStep, targetDate: g.targetDate })),
         inbox: d.inbox.map((x) => ({ id: x.id, text: x.text })),
         recentWins: d.wins.slice(0, 10),
         daysShowedUp: daysShowedUp(d),
-        tone: "Be kind and non-judgmental. Never shame missed items; frame gaps as rest.",
+        tone: "Be kind and non-judgmental. Only meds, water and eating something nourishing are non-negotiable; everything else is a bonus to celebrate, never a miss.",
     };
 }
 

@@ -86,6 +86,19 @@
   dialog input, dialog select, dialog textarea { width: 100%; }
   .empty { color: var(--muted); padding: 10px 4px; font-style: italic; }
   .section-label { text-transform: uppercase; letter-spacing: .06em; font-size: .75em; color: var(--muted); margin: 10px 6px 2px; }
+  body.home header, body.home #dumpForm, body.home nav { display: none; }
+  .home-wrap { text-align: center; padding: 28px 0 12px; }
+  .home-emoji { font-size: 3.6em; line-height: 1; }
+  .home-hello { font-size: 1.7em; font-weight: 600; margin: 12px 0 4px; }
+  .breathe { margin: 22px auto; max-width: 420px; }
+  .breathe-ring { width: 92px; height: 92px; margin: 10px auto; border-radius: 50%; background: var(--accent-soft); border: 2px solid var(--accent); transform: scale(.7); transition: transform 4s ease-in-out; }
+  .breathe-ring.in { transform: scale(1.1); }
+  .breathe-ring.out { transform: scale(.7); transition-duration: 6s; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 460px; margin: 18px auto 8px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 10px; border-radius: var(--radius); font-size: 1em; }
+  .tile .ic { font-size: 2.2em; line-height: 1; }
+  .tile .hint { font-size: .78em; color: var(--muted); }
+  .home-more { margin-top: 14px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -108,11 +121,11 @@
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let S = null;
-let tab = sessionStorage.getItem("cc-tab") || "today";
+let tab = "home";
 let showAll = false;
 const timer = { end: null, mins: 15, handle: null, label: "" };
 
-const TABS = [["today", "☀️ Today"], ["interests", "🎨 Interests"], ["growth", "🌱 Growth"], ["inbox", "🧠 Brain dump"], ["wins", "🌟 Wins"], ["settings", "⚙️ Settings"]];
+const TABS = [["home", "🏠 Home"], ["today", "☀️ Today"], ["interests", "🎨 Interests"], ["growth", "🌱 Growth"], ["inbox", "🧠 Brain dump"], ["wins", "🌟 Wins"], ["settings", "⚙️ Settings"]];
 const PARTS = [["morning", "🌅 Morning"], ["afternoon", "🌤️ Afternoon"], ["evening", "🌙 Evening"], ["anytime", "🕊️ Anytime"]];
 const INTEREST_STATUS = { active: ["Active", "green"], simmering: ["Simmering", "yellow"], resting: ["Resting", "purple"] };
 const GROWTH_STATUS = { exploring: ["Exploring", "yellow"], "in-progress": ["In progress", "green"], paused: ["Paused (that's fine)", "purple"], done: ["Done 🎉", "green"] };
@@ -162,9 +175,48 @@ function render() {
   const dayIdx = Math.floor(Date.now() / 86400000) % AFFIRM.length;
   $("#subline").textContent = `${new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} · ${AFFIRM[dayIdx]}`;
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${k === "inbox" && S.inbox.length ? ` <span class="chip">${S.inbox.length}</span>` : ""}</button>`).join("");
+  document.body.classList.toggle("home", tab === "home");
   const v = $("#view");
-  v.innerHTML = { today: viewToday, interests: viewInterests, growth: viewGrowth, inbox: viewInbox, wins: viewWins, settings: viewSettings }[tab]();
+  v.innerHTML = { home: viewHome, today: viewToday, interests: viewInterests, growth: viewGrowth, inbox: viewInbox, wins: viewWins, settings: viewSettings }[tab]();
   if (tab === "today") tickTimer();
+}
+
+/* ---------- Home ---------- */
+const STARTERS = [
+  ["today", "☀️", "Daily reminders", "Gentle nudges for the basics"],
+  ["inbox", "🧠", "Brain dump", "Set down what's on your mind"],
+  ["interests", "🎨", "Interests", "Things that bring you joy"],
+  ["growth", "🌱", "Growth", "Learning, just for you"],
+];
+function viewHome() {
+  const h = new Date().getHours();
+  const [emoji, part] = h < 5 ? ["🌙", "Hi there, night owl"] : h < 12 ? ["🌻", "Good morning"] : h < 17 ? ["☀️", "Good afternoon"] : ["🌷", "Good evening"];
+  return `<div class="home-wrap">
+    <div class="home-emoji emoji-deco" aria-hidden="true">${emoji}</div>
+    <div class="home-hello">${part}${S.settings.name ? ", " + esc(S.settings.name) : ""}. I'm glad you're here.</div>
+    <div class="muted">There's nothing you have to do right now.</div>
+    <div class="card breathe">
+      <div id="breatheText">Let's take one deep breath together.</div>
+      <div class="breathe-ring" id="breatheRing" aria-hidden="true"></div>
+      <button data-breathe>🌬️ Breathe with me</button>
+    </div>
+    <div class="muted small">When you're ready, pick something to start tracking:</div>
+    <div class="tiles">${STARTERS.map(([k, ic, label, hint]) => `<button class="tile" data-tab="${k}"><span class="ic" aria-hidden="true">${ic}</span><b>${label}</b><span class="hint">${hint}</span></button>`).join("")}</div>
+    <div class="home-more"><button class="ghost small" data-tab="wins">🌟 Wins</button> <button class="ghost small" data-tab="settings">⚙️ Settings</button></div>
+  </div>`;
+}
+const breath = { timers: [] };
+function breathe() {
+  breath.timers.forEach(clearTimeout); breath.timers = [];
+  const txt = $("#breatheText"), ring = $("#breatheRing"); if (!txt || !ring) return;
+  const step = (ms, label, cls) => breath.timers.push(setTimeout(() => { const t = $("#breatheText"), r = $("#breatheRing"); if (!t || !r) return; t.textContent = label; r.className = "breathe-ring" + (cls ? " " + cls : ""); }, ms));
+  let t = 0;
+  for (let i = 0; i < 3; i++) {
+    step(t, "Breathe in slowly… 2… 3… 4", "in"); t += 4000;
+    step(t, "Hold gently…", "in"); t += 2000;
+    step(t, "And let it all out… 2… 3… 4… 5… 6", "out"); t += 6000;
+  }
+  step(t, "Nice. That was enough. 💛", "");
 }
 
 /* ---------- Today ---------- */
@@ -178,19 +230,31 @@ function routineState(r) {
 }
 function dueNudges() {
   const now = new Date(), hm = now.getHours() * 60 + now.getMinutes();
-  return S.routines.filter((r) => r.active && r.time).filter((r) => {
+  return S.routines.filter((r) => r.active && r.essential && r.time).filter((r) => {
     const [hh, mm] = r.time.split(":").map(Number);
     const st = routineState(r);
     return hh * 60 + mm <= hm && !st.done && !st.skipped && !st.snoozed;
   });
+}
+function nonNegHtml(items, d) {
+  const done = items.filter((r) => routineState(r).done).length;
+  const msg = !items.length ? "" : done === items.length ? "All three — you took care of yourself today. 💛" : done ? `${done} of ${items.length} — you're looking after yourself.` : "Just these. Whenever you're ready.";
+  return `<div class="card"><h2>💛 Non-negotiables <span class="muted small" style="font-weight:400">· ${msg}</span></h2>
+    ${items.map((r) => {
+      const st = routineState(r);
+      return `<div class="item ${st.done ? "done" : ""}">
+        <button class="check" data-toggle-r="${r.id}" aria-label="${st.done ? "Undo" : "Mark done"}: ${esc(r.title)}">${st.done ? "✓" : ""}</button>
+        <span class="label grow">${esc(r.emoji)} ${esc(r.title)} ${r.time ? `<span class="muted small">· ${esc(r.time)}</span>` : ""} ${st.snoozed ? `<span class="chip yellow">in a bit</span>` : ""}</span>
+        ${!st.done && !st.snoozed ? `<button class="ghost small" data-snooze="${r.id}" title="Remind me in 30 minutes">later</button>` : ""}
+      </div>`;
+    }).join("") || `<div class="empty">No non-negotiables set.</div>`}
+  </div>`;
 }
 function viewToday() {
   const d = today();
   const ci = S.checkins[d] || {};
   const low = ci.energy === "low";
   const active = S.routines.filter((r) => r.active);
-  const visible = low && !showAll ? active.filter((r) => r.essential) : active;
-  const doneCount = Object.keys(S.checks[d] || {}).length + S.tasks.filter((t) => t.done && t.doneAt && t.doneAt.slice(0, 10) === d).length;
   const nudges = dueNudges();
   const openTasks = S.tasks.filter((t) => !t.done && (!t.date || t.date <= d));
   const laterTasks = S.tasks.filter((t) => !t.done && t.date && t.date > d);
@@ -199,31 +263,38 @@ function viewToday() {
     <div class="row energy">
       ${[["low", "🪫 Low"], ["medium", "🔋 Okay"], ["high", "⚡ Charged"]].map(([k, l]) => `<button data-energy="${k}" aria-pressed="${ci.energy === k}">${l}</button>`).join("")}
     </div>
-    <div class="muted small" style="margin-top:8px">${ci.energy === "low" ? "Essentials only today. Everything else will keep. 💛" : ci.energy === "high" ? "Lovely! Maybe peek at an interest or growth item later — only if it sounds fun." : ci.energy ? "Steady is great. One thing at a time." : "No wrong answers — this just helps tailor today."}</div>
+    <div class="muted small" style="margin-top:8px">${ci.energy === "low" ? "Just the non-negotiables today. Everything else will keep. 💛" : ci.energy === "high" ? "Lovely! Maybe peek at an interest or growth item later — only if it sounds fun." : ci.energy ? "Steady is great. One thing at a time." : "No wrong answers — this just helps tailor today."}</div>
   </div>`;
 
   if (nudges.length) {
     html += `<div class="card nudge"><h2>🔔 Gentle nudge</h2>${nudges.map((r) => `
       <div class="row" style="margin:6px 0"><span class="grow">${esc(r.emoji)} ${esc(r.title)} <span class="muted small">· whenever you're ready</span></span>
-      <button data-toggle-r="${r.id}">Done</button><button data-snooze="${r.id}">Later (30m)</button><button class="ghost" data-skip="${r.id}">Not today</button></div>`).join("")}</div>`;
+      <button data-toggle-r="${r.id}">Done</button><button data-snooze="${r.id}">Later (30m)</button></div>`).join("")}</div>`;
   }
 
-  html += `<div class="card"><h2>Daily reminders <span class="muted small" style="font-weight:400">· ${doneCount ? `${doneCount} thing${doneCount > 1 ? "s" : ""} done today ✨` : "nothing is required"}</span></h2>`;
-  for (const [pk, pl] of PARTS) {
-    const items = visible.filter((r) => r.part === pk);
-    if (!items.length) continue;
-    html += `<div class="section-label">${pl}</div>`;
-    html += items.map((r) => {
-      const st = routineState(r);
-      return `<div class="item ${st.done ? "done" : ""}">
-        <button class="check" data-toggle-r="${r.id}" aria-label="${st.done ? "Undo" : "Mark done"}: ${esc(r.title)}">${st.done ? "✓" : ""}</button>
-        <span class="label grow">${esc(r.emoji)} ${esc(r.title)} ${r.time ? `<span class="muted small">· ${esc(r.time)}</span>` : ""} ${r.essential ? `<span class="chip green">essential</span>` : ""} ${st.skipped ? `<span class="chip purple">resting today</span>` : ""} ${st.snoozed ? `<span class="chip yellow">snoozed</span>` : ""}</span>
-        ${!st.done && !st.skipped ? `<button class="ghost small" data-skip="${r.id}" title="Skip for today, no guilt">skip</button>` : ""}
-      </div>`;
-    }).join("");
+  html += nonNegHtml(active.filter((r) => r.essential), d);
+  const bonus = active.filter((r) => !r.essential);
+  const bonusDone = bonus.filter((r) => routineState(r).done).length;
+  if (bonus.length) {
+    const open = !low || showAll;
+    html += `<div class="card"><h2>🎉 Bonus wins <span class="muted small" style="font-weight:400">· ${bonusDone ? `${bonusDone} celebrated today! 🥳` : "all extra — none required"}</span></h2>
+      <div class="muted small">Nothing here can be missed. Each one you do is something to celebrate.</div>`;
+    if (open) {
+      for (const [pk, pl] of PARTS) {
+        const items = bonus.filter((r) => r.part === pk);
+        if (!items.length) continue;
+        html += `<div class="section-label">${pl}</div>` + items.map((r) => {
+          const st = routineState(r);
+          return `<div class="item ${st.done ? "done" : ""}">
+            <button class="check" data-toggle-r="${r.id}" aria-label="${st.done ? "Undo" : "Celebrate"}: ${esc(r.title)}">${st.done ? "🎉" : ""}</button>
+            <span class="label grow">${esc(r.emoji)} ${esc(r.title)} ${r.time ? `<span class="muted small">· ${esc(r.time)}</span>` : ""}</span>
+          </div>`;
+        }).join("");
+      }
+    }
+    if (low) html += `<div style="margin-top:8px"><button class="ghost small" data-showall>${showAll ? "Tuck these away for today" : `Peek at bonus wins (${bonus.length})`}</button></div>`;
+    html += `</div>`;
   }
-  if (low) html += `<div style="margin-top:8px"><button class="ghost small" data-showall>${showAll ? "Back to essentials only" : `Show everything (${active.length - visible.length} hidden)`}</button></div>`;
-  html += `</div>`;
 
   html += `<div class="card"><h2>One-off things</h2>
     <form class="row" id="taskForm" autocomplete="off"><input class="grow" name="title" placeholder="Add a thing (e.g. 'Reply to the dentist')" aria-label="New task" /><input type="date" name="date" aria-label="Optional date" /><button class="primary">Add</button></form>
@@ -333,10 +404,10 @@ function viewSettings() {
     </div>
     ${viewSync()}
     <div class="card"><h2>Daily reminders</h2>
-      <div class="muted small">“Essential” ones still show on low-battery days. Times are optional and only produce gentle nudges.</div>
-      ${S.routines.map((r) => `<div class="item"><span class="grow">${esc(r.emoji)} ${esc(r.title)} <span class="muted small">· ${r.part}${r.time ? " · " + r.time : ""}</span> ${r.essential ? `<span class="chip green">essential</span>` : ""} ${r.active ? "" : `<span class="chip purple">paused</span>`}</span>
+      <div class="muted small">💛 Non-negotiables get gentle nudges and always show. Everything else is a 🎉 bonus win — never a miss.</div>
+      ${S.routines.map((r) => `<div class="item"><span class="grow">${esc(r.emoji)} ${esc(r.title)} <span class="muted small">· ${r.part}${r.time ? " · " + r.time : ""}</span> ${r.essential ? `<span class="chip green">non-negotiable</span>` : `<span class="chip yellow">bonus win</span>`} ${r.active ? "" : `<span class="chip purple">paused</span>`}</span>
         <button class="ghost small" data-edit-r="${r.id}">Edit</button></div>`).join("")}
-      <div class="row" style="margin-top:8px"><button data-add-r>+ Add reminder</button><button data-ics>📅 Add timed nudges to my calendar</button></div>
+      <div class="row" style="margin-top:8px"><button data-add-r>+ Add reminder</button><button data-ics>📅 Add non-negotiables to my calendar</button></div>
       <div class="muted small" style="margin-top:4px">Calendar alarms are the most reliable way to get nudges on your phone even when this app is closed.</div>
     </div>`;
 }
@@ -402,7 +473,7 @@ const routineFields = (r = {}) => [
   { name: "emoji", label: "Emoji", value: r.emoji || "✨" },
   { name: "part", label: "Part of day", type: "select", value: r.part || "anytime", options: Object.fromEntries(PARTS) },
   { name: "time", label: "Nudge time (optional)", type: "time", value: r.time || "" },
-  { name: "essential", label: "Essential — show even on low-battery days", type: "checkbox", value: !!r.essential },
+  { name: "essential", label: "💛 Non-negotiable (otherwise it's a 🎉 bonus win)", type: "checkbox", value: !!r.essential },
   ...(r.id ? [{ name: "active", label: "Active", type: "checkbox", value: r.active !== false }] : []),
 ];
 
@@ -418,8 +489,8 @@ function notify(title, body) {
 
 /* ---------- Calendar export: real phone alarms for timed reminders ---------- */
 function exportIcs() {
-  const timed = S.routines.filter((r) => r.active && r.time);
-  if (!timed.length) { toast("Give a reminder a nudge time first — then it can go on your calendar."); return; }
+  const timed = S.routines.filter((r) => r.active && r.essential && r.time);
+  if (!timed.length) { toast("Give a non-negotiable a nudge time first — then it can go on your calendar."); return; }
   const d = today().replace(/-/g, "");
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Command Center//EN", "CALSCALE:GREGORIAN"];
@@ -446,7 +517,8 @@ setInterval(() => {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   const ds = b.dataset;
-  if (ds.tab) { tab = ds.tab; sessionStorage.setItem("cc-tab", tab); render(); return; }
+  if (ds.tab) { tab = ds.tab; render(); window.scrollTo(0, 0); return; }
+  if (ds.breathe !== undefined) return breathe();
   if (ds.energy) return op("checkin", { energy: ds.energy });
   if (ds.toggleR) return op("toggleRoutine", { id: ds.toggleR });
   if (ds.skip) return op("skipRoutine", { id: ds.skip });
