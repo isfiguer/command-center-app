@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Command Center</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#8a6fd1" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Command Center" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<style>body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }</style>
+<script src="app.js"></script>
+<style>
+  :root {
+    --bg: var(--background-color-default, #fbfaf7);
+    --fg: var(--text-color-default, #2b2a28);
+    --muted: var(--text-color-muted, #6b6862);
+    --border: var(--border-color-default, #e3dfd6);
+    --accent: var(--true-color-blue, #5b7fbf);
+    --accent-soft: var(--true-color-blue-muted, rgba(91,127,191,.14));
+    --green: var(--true-color-green, #4f9d74);
+    --green-soft: var(--true-color-green-muted, rgba(79,157,116,.14));
+    --purple-soft: var(--true-color-purple-muted, rgba(140,110,200,.14));
+    --yellow-soft: var(--true-color-yellow-muted, rgba(220,180,60,.16));
+    --radius: 14px;
+    --scale: 1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: var(--font-sans, -apple-system, "Segoe UI", system-ui, sans-serif);
+    font-size: calc(15px * var(--scale)); line-height: 1.55;
+  }
+  body.lowstim * { animation: none !important; transition: none !important; }
+  body.lowstim .emoji-deco { display: none; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 18px 18px 60px; }
+  header h1 { margin: 0; font-size: 1.5em; font-weight: 600; }
+  header .sub { color: var(--muted); margin-top: 2px; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0; position: sticky; top: 0; background: var(--bg); padding: 8px 0; z-index: 5; }
+  nav button { border-radius: 999px; }
+  nav button[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+  button, input, select, textarea {
+    font: inherit; color: inherit; background: transparent;
+    border: 1px solid var(--border); border-radius: 10px; padding: 6px 12px;
+  }
+  button { cursor: pointer; }
+  button:hover { background: var(--accent-soft); }
+  button.primary { background: var(--accent); color: var(--color-white, #fff); border-color: var(--accent); }
+  button.ghost { border-color: transparent; color: var(--muted); padding: 4px 8px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--color-focus-outline, var(--accent)); outline-offset: 2px; }
+  input, select, textarea { background: var(--bg); }
+  textarea { width: 100%; min-height: 70px; resize: vertical; }
+  .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin: 12px 0; }
+  .card h2 { font-size: 1.05em; margin: 0 0 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .muted { color: var(--muted); }
+  .small { font-size: .88em; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 160px; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; }
+  .item:hover { background: var(--accent-soft); }
+  .item.done .label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+  .check { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; padding: 0; flex: none; }
+  .done .check { background: var(--green); border-color: var(--green); color: #fff; }
+  .chip { display: inline-block; font-size: .78em; padding: 1px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--fg); }
+  .chip.green { background: var(--green-soft); } .chip.purple { background: var(--purple-soft); } .chip.yellow { background: var(--yellow-soft); }
+  .energy button { padding: 10px 16px; border-radius: 12px; }
+  .energy button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+  .nudge { background: var(--yellow-soft); border-color: transparent; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 999px; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90%; text-align: center; z-index: 50; }
+  .toast.show { opacity: .95; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .grid .card { margin: 0; }
+  .bar { height: 8px; background: var(--accent-soft); border-radius: 999px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 999px; }
+  .timer { font-variant-numeric: tabular-nums; font-size: 1.8em; font-weight: 600; }
+  .steps { margin: 4px 0 4px 36px; }
+  .steps .item { padding: 3px 6px; }
+  .steps .check { width: 20px; height: 20px; }
+  dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--fg); width: min(480px, 92vw); padding: 18px; }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog label { display: block; margin: 10px 0 4px; font-size: .9em; color: var(--muted); }
+  dialog input, dialog select, dialog textarea { width: 100%; }
+  .empty { color: var(--muted); padding: 10px 4px; font-style: italic; }
+  .section-label { text-transform: uppercase; letter-spacing: .06em; font-size: .75em; color: var(--muted); margin: 10px 6px 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="greet">Hello 👋</h1>
+    <div class="sub" id="subline"></div>
+  </header>
+  <form class="row" id="dumpForm" style="margin-top:12px" autocomplete="off">
+    <input class="grow" id="dumpInput" placeholder="🧠 Brain dump — type anything on your mind and press Enter" aria-label="Brain dump" />
+  </form>
+  <nav role="tablist" id="tabs"></nav>
+  <main id="view"></main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let S = null;
+let tab = sessionStorage.getItem("cc-tab") || "today";
+let showAll = false;
+const timer = { end: null, mins: 15, handle: null, label: "" };
+
+const TABS = [["today", "☀️ Today"], ["interests", "🎨 Interests"], ["growth", "🌱 Growth"], ["inbox", "🧠 Brain dump"], ["wins", "🌟 Wins"], ["settings", "⚙️ Settings"]];
+const PARTS = [["morning", "🌅 Morning"], ["afternoon", "🌤️ Afternoon"], ["evening", "🌙 Evening"], ["anytime", "🕊️ Anytime"]];
+const INTEREST_STATUS = { active: ["Active", "green"], simmering: ["Simmering", "yellow"], resting: ["Resting", "purple"] };
+const GROWTH_STATUS = { exploring: ["Exploring", "yellow"], "in-progress": ["In progress", "green"], paused: ["Paused (that's fine)", "purple"], done: ["Done 🎉", "green"] };
+const GROWTH_TYPES = { course: "🎓 Course", book: "📚 Book", cert: "🏅 Certification", event: "🎤 Event / meetup", project: "🛠️ Side project", skill: "🧩 Skill", community: "🤝 Community" };
+const AFFIRM = [
+  "You don't have to do it all. Just the next small thing.",
+  "Rest is productive too.",
+  "Your pace is a valid pace.",
+  "Starting is the hardest part — and you can start tiny.",
+  "Nothing here is a test. It's just a helping hand.",
+  "Whatever today looks like, you're doing okay.",
+  "Unfinished isn't failed. It's just not finished yet.",
+];
+
+function today() { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
+function daysAgo(dateStr) { if (!dateStr) return null; return Math.round((new Date(today()) - new Date(dateStr)) / 86400000); }
+function toast(msg) { if (!msg) return; const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3200); }
+
+const API = window.CC_API || {
+  state: async () => (await fetch("api/state")).json(),
+  op: async (name, payload) => { const r = await fetch("api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: name, payload }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); return j; },
+  sync: async (body) => { const r = await fetch("api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); return j; },
+  subscribe: (fn) => { const es = new EventSource("events"); es.onmessage = fn; },
+};
+async function load() { S = await API.state(); render(); }
+async function op(name, payload = {}) {
+  let j;
+  try { j = await API.op(name, { date: today(), ...payload }); }
+  catch (e) { toast(e.message || "Hmm, that didn't work. No worries — try again?"); return; }
+  S = j.state; render(); toast(j.message);
+}
+async function syncAction(body) {
+  try { const j = await API.sync(body); S = j.state; render(); toast(j.message); }
+  catch (e) { toast(e.message || "Sync didn't work this time — your data is safe here."); }
+}
+
+function applySettings() {
+  document.body.classList.toggle("lowstim", !!S.settings.lowStim);
+  document.documentElement.style.setProperty("--scale", S.settings.textScale || 1);
+}
+
+function render() {
+  applySettings();
+  const h = new Date().getHours();
+  const part = h < 5 ? "Hi there, night owl" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  $("#greet").textContent = `${part}${S.settings.name ? ", " + S.settings.name : ""} 👋`;
+  const dayIdx = Math.floor(Date.now() / 86400000) % AFFIRM.length;
+  $("#subline").textContent = `${new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} · ${AFFIRM[dayIdx]}`;
+  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${l}${k === "inbox" && S.inbox.length ? ` <span class="chip">${S.inbox.length}</span>` : ""}</button>`).join("");
+  const v = $("#view");
+  v.innerHTML = { today: viewToday, interests: viewInterests, growth: viewGrowth, inbox: viewInbox, wins: viewWins, settings: viewSettings }[tab]();
+  if (tab === "today") tickTimer();
+}
+
+/* ---------- Today ---------- */
+function routineState(r) {
+  const d = today();
+  const done = !!(S.checks[d] || {})[r.id];
+  const skip = (S.skips[d] || {})[r.id];
+  const skipped = skip === "day";
+  const snoozed = skip && skip !== "day" && new Date(skip) > new Date();
+  return { done, skipped, snoozed };
+}
+function dueNudges() {
+  const now = new Date(), hm = now.getHours() * 60 + now.getMinutes();
+  return S.routines.filter((r) => r.active && r.time).filter((r) => {
+    const [hh, mm] = r.time.split(":").map(Number);
+    const st = routineState(r);
+    return hh * 60 + mm <= hm && !st.done && !st.skipped && !st.snoozed;
+  });
+}
+function viewToday() {
+  const d = today();
+  const ci = S.checkins[d] || {};
+  const low = ci.energy === "low";
+  const active = S.routines.filter((r) => r.active);
+  const visible = low && !showAll ? active.filter((r) => r.essential) : active;
+  const doneCount = Object.keys(S.checks[d] || {}).length + S.tasks.filter((t) => t.done && t.doneAt && t.doneAt.slice(0, 10) === d).length;
+  const nudges = dueNudges();
+  const openTasks = S.tasks.filter((t) => !t.done && (!t.date || t.date <= d));
+  const laterTasks = S.tasks.filter((t) => !t.done && t.date && t.date > d);
+
+  let html = `<div class="card"><h2>How's your battery right now?</h2>
+    <div class="row energy">
+      ${[["low", "🪫 Low"], ["medium", "🔋 Okay"], ["high", "⚡ Charged"]].map(([k, l]) => `<button data-energy="${k}" aria-pressed="${ci.energy === k}">${l}</button>`).join("")}
+    </div>
+    <div class="muted small" style="margin-top:8px">${ci.energy === "low" ? "Essentials only today. Everything else will keep. 💛" : ci.energy === "high" ? "Lovely! Maybe peek at an interest or growth item later — only if it sounds fun." : ci.energy ? "Steady is great. One thing at a time." : "No wrong answers — this just helps tailor today."}</div>
+  </div>`;
+
+  if (nudges.length) {
+    html += `<div class="card nudge"><h2>🔔 Gentle nudge</h2>${nudges.map((r) => `
+      <div class="row" style="margin:6px 0"><span class="grow">${esc(r.emoji)} ${esc(r.title)} <span class="muted small">· whenever you're ready</span></span>
+      <button data-toggle-r="${r.id}">Done</button><button data-snooze="${r.id}">Later (30m)</button><button class="ghost" data-skip="${r.id}">Not today</button></div>`).join("")}</div>`;
+  }
+
+  html += `<div class="card"><h2>Daily reminders <span class="muted small" style="font-weight:400">· ${doneCount ? `${doneCount} thing${doneCount > 1 ? "s" : ""} done today ✨` : "nothing is required"}</span></h2>`;
+  for (const [pk, pl] of PARTS) {
+    const items = visible.filter((r) => r.part === pk);
+    if (!items.length) continue;
+    html += `<div class="section-label">${pl}</div>`;
+    html += items.map((r) => {
+      const st = routineState(r);
+      return `<div class="item ${st.done ? "done" : ""}">
+        <button class="check" data-toggle-r="${r.id}" aria-label="${st.done ? "Undo" : "Mark done"}: ${esc(r.title)}">${st.done ? "✓" : ""}</button>
+        <span class="label grow">${esc(r.emoji)} ${esc(r.title)} ${r.time ? `<span class="muted small">· ${esc(r.time)}</span>` : ""} ${r.essential ? `<span class="chip green">essential</span>` : ""} ${st.skipped ? `<span class="chip purple">resting today</span>` : ""} ${st.snoozed ? `<span class="chip yellow">snoozed</span>` : ""}</span>
+        ${!st.done && !st.skipped ? `<button class="ghost small" data-skip="${r.id}" title="Skip for today, no guilt">skip</button>` : ""}
+      </div>`;
+    }).join("");
+  }
+  if (low) html += `<div style="margin-top:8px"><button class="ghost small" data-showall>${showAll ? "Back to essentials only" : `Show everything (${active.length - visible.length} hidden)`}</button></div>`;
+  html += `</div>`;
+
+  html += `<div class="card"><h2>One-off things</h2>
+    <form class="row" id="taskForm" autocomplete="off"><input class="grow" name="title" placeholder="Add a thing (e.g. 'Reply to the dentist')" aria-label="New task" /><input type="date" name="date" aria-label="Optional date" /><button class="primary">Add</button></form>
+    ${openTasks.length ? openTasks.map(taskHtml).join("") : `<div class="empty">Nothing here. Enjoy the space. 🌿</div>`}
+    ${laterTasks.length ? `<details style="margin-top:8px"><summary class="muted small">Coming up later (${laterTasks.length})</summary>${laterTasks.map(taskHtml).join("")}</details>` : ""}
+  </div>`;
+
+  html += `<div class="card"><h2>⏳ Focus buddy</h2>
+    <div class="muted small">Stuck starting? Pick a tiny window. You can stop when it ends — or keep going if you're in the zone.</div>
+    <div class="row" style="margin-top:8px">
+      ${[2, 5, 15, 25, 45].map((m) => `<button data-timer="${m}">${m} min</button>`).join("")}
+      <span class="timer" id="timerOut" style="margin-left:auto">${timer.end ? "" : "—"}</span>
+      ${timer.end ? `<button class="ghost" data-timer-stop>Stop</button>` : ""}
+    </div>
+    ${timer.label ? `<div class="small muted">Working on: ${esc(timer.label)}</div>` : ""}
+  </div>`;
+
+  const show = S.daysShowedUp;
+  html += `<div class="muted small" style="text-align:center;margin-top:20px">You've shown up for yourself on ${show} day${show === 1 ? "" : "s"}. That number only goes up. 💛</div>`;
+  return html;
+}
+function taskHtml(t) {
+  const sd = t.steps.filter((s) => s.done).length;
+  return `<div class="item ${t.done ? "done" : ""}">
+      <button class="check" data-toggle-t="${t.id}" aria-label="Mark done: ${esc(t.title)}">${t.done ? "✓" : ""}</button>
+      <span class="label grow">${esc(t.title)} ${t.date ? `<span class="muted small">· ${esc(t.date)}</span>` : ""} ${t.steps.length ? `<span class="chip">${sd}/${t.steps.length} steps</span>` : ""}</span>
+      <button class="ghost small" data-break="${t.id}" title="Split into tiny steps">✂️ tiny steps</button>
+      <button class="ghost small" data-start="${t.id}" title="Start a 2-minute timer">▶ 2-min start</button>
+      <button class="ghost small" data-del-t="${t.id}" aria-label="Remove">✕</button>
+    </div>
+    ${t.steps.length ? `<div class="steps">${t.steps.map((s, i) => `<div class="item ${s.done ? "done" : ""}"><button class="check" data-step="${t.id}:${i}">${s.done ? "✓" : ""}</button><span class="label">${esc(s.t)}</span></div>`).join("")}</div>` : ""}`;
+}
+function tickTimer() {
+  clearInterval(timer.handle);
+  const out = $("#timerOut");
+  if (!timer.end || !out) return;
+  const upd = () => {
+    const left = Math.max(0, timer.end - Date.now());
+    const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+    const o = $("#timerOut"); if (o) o.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    if (left <= 0) {
+      clearInterval(timer.handle); timer.end = null; timer.label = "";
+      toast("Time's up! However it went, you showed up. 🌟");
+      notify("Focus window finished", "However it went, you showed up. 🌟");
+      render();
+    }
+  };
+  upd(); timer.handle = setInterval(upd, 1000);
+}
+
+/* ---------- Interests ---------- */
+function viewInterests() {
+  const order = { active: 0, simmering: 1, resting: 2 };
+  const list = [...S.interests].sort((a, b) => order[a.status] - order[b.status]);
+  return `<div class="row" style="justify-content:space-between"><div class="muted">Interests come and go in seasons. Resting ones aren't abandoned — they're waiting for you. 🌙</div>
+    <button class="primary" data-add-interest>+ Add interest</button></div>
+    <div class="grid" style="margin-top:12px">${list.length ? list.map((i) => {
+      const last = i.sessions[0]?.date; const ago = daysAgo(last);
+      const total = i.sessions.reduce((a, s) => a + (s.minutes || 0), 0);
+      const [sl, sc] = INTEREST_STATUS[i.status] || INTEREST_STATUS.active;
+      return `<div class="card"><h2><span style="font-size:1.4em">${esc(i.emoji)}</span> ${esc(i.name)} <span class="chip ${sc}">${sl}</span></h2>
+        ${i.nextStep ? `<div><span class="muted small">Next tiny step:</span> ${esc(i.nextStep)}</div>` : ""}
+        ${i.notes ? `<div class="small muted" style="margin-top:4px;white-space:pre-wrap">${esc(i.notes)}</div>` : ""}
+        <div class="small muted" style="margin-top:6px">${last ? (ago === 0 ? "You spent time here today 💛" : `Last visited ${ago} day${ago === 1 ? "" : "s"} ago${ago > 14 ? " — it'll be here when you're ready" : ""}`) : "Not logged yet — no rush."}${total ? ` · ${Math.round(total / 6) / 10}h total` : ""}</div>
+        <div class="row" style="margin-top:10px"><button data-log-interest="${i.id}">＋ Log time</button><button class="ghost" data-edit-interest="${i.id}">Edit</button></div>
+      </div>`; }).join("") : `<div class="empty">Add the things that light you up — hobbies, rabbit holes, special interests, creative stuff.</div>`}</div>`;
+}
+
+/* ---------- Growth ---------- */
+function viewGrowth() {
+  const order = { "in-progress": 0, exploring: 1, paused: 2, done: 3 };
+  const list = [...S.growth].sort((a, b) => order[a.status] - order[b.status]);
+  return `<div class="row" style="justify-content:space-between"><div class="muted">Learning on your own terms — outside of work, at your own pace.</div>
+    <button class="primary" data-add-growth>+ Add growth item</button></div>
+    ${list.length ? list.map((g) => {
+      const [sl, sc] = GROWTH_STATUS[g.status] || GROWTH_STATUS.exploring;
+      return `<div class="card"><h2>${esc(GROWTH_TYPES[g.type] || g.type)} · ${g.link ? `<a href="${esc(g.link)}" target="_blank" rel="noopener">${esc(g.title)}</a>` : esc(g.title)} <span class="chip ${sc}">${sl}</span></h2>
+        <div class="row"><div class="bar grow"><div style="width:${g.progress}%"></div></div><span class="small muted">${g.progress}%</span></div>
+        ${g.nextStep ? `<div style="margin-top:6px"><span class="muted small">Next tiny step:</span> ${esc(g.nextStep)}</div>` : ""}
+        ${g.targetDate ? `<div class="small muted">Loosely aiming for ${esc(g.targetDate)} (dates are flexible)</div>` : ""}
+        ${g.notes ? `<div class="small muted" style="white-space:pre-wrap">${esc(g.notes)}</div>` : ""}
+        <div class="row" style="margin-top:8px">
+          ${g.status !== "done" ? `<button data-bump="${g.id}">＋10% progress</button><button data-gdone="${g.id}">Mark done</button>` : ""}
+          <button class="ghost" data-edit-growth="${g.id}">Edit</button></div>
+      </div>`; }).join("") : `<div class="empty">Courses, books, certifications, meetups, side projects, skills you're curious about… add one whenever.</div>`}`;
+}
+
+/* ---------- Inbox / Wins / Settings ---------- */
+function viewInbox() {
+  return `<div class="muted">Everything you brain-dump lands here. Sort it later — or never. Capturing it is the win.</div>
+    ${S.inbox.length ? S.inbox.map((x) => `<div class="item"><span class="grow">${esc(x.text)} <span class="muted small">· ${new Date(x.createdAt).toLocaleDateString()}</span></span>
+      <button class="ghost small" data-dump-task="${x.id}">→ make it a task</button><button class="ghost small" data-del-dump="${x.id}" aria-label="Let it go">let go ✕</button></div>`).join("") : `<div class="empty">Empty mind-inbox. Ahh. 🌬️</div>`}`;
+}
+function viewWins() {
+  return `<form class="row" id="winForm" autocomplete="off"><input class="grow" name="text" placeholder="Log a win — any size counts (got out of bed? that counts.)" /><button class="primary">Save win</button></form>
+    ${S.wins.length ? S.wins.slice(0, 100).map((w) => `<div class="item"><span>🌟</span><span class="grow">${esc(w.text)}</span><span class="muted small">${esc(w.date)}</span></div>`).join("") : `<div class="empty">Wins will collect here automatically as you go.</div>`}`;
+}
+function viewSettings() {
+  const st = S.settings;
+  return `<div class="card"><h2>About you</h2>
+      <div class="row"><label class="muted small">What should I call you?</label><input id="setName" value="${esc(st.name)}" placeholder="Your name" /><button data-save-name>Save</button></div>
+    </div>
+    <div class="card"><h2>Comfort</h2>
+      <label class="row"><input type="checkbox" id="setLow" ${st.lowStim ? "checked" : ""}/> Low-stimulation mode (no animations, fewer decorations)</label>
+      <div class="row" style="margin-top:8px"><span class="muted small">Text size</span>${[[0.9, "A−"], [1, "A"], [1.15, "A+"], [1.3, "A++"]].map(([v, l]) => `<button data-scale="${v}" aria-pressed="${(st.textScale || 1) == v}">${l}</button>`).join("")}</div>
+      <div class="row" style="margin-top:8px"><button data-notify>Enable nudges</button><span class="muted small">Optional — gentle pop-ups when a timed reminder arrives (while the app is open).</span></div>
+    </div>
+    ${viewSync()}
+    <div class="card"><h2>Daily reminders</h2>
+      <div class="muted small">“Essential” ones still show on low-battery days. Times are optional and only produce gentle nudges.</div>
+      ${S.routines.map((r) => `<div class="item"><span class="grow">${esc(r.emoji)} ${esc(r.title)} <span class="muted small">· ${r.part}${r.time ? " · " + r.time : ""}</span> ${r.essential ? `<span class="chip green">essential</span>` : ""} ${r.active ? "" : `<span class="chip purple">paused</span>`}</span>
+        <button class="ghost small" data-edit-r="${r.id}">Edit</button></div>`).join("")}
+      <div class="row" style="margin-top:8px"><button data-add-r>+ Add reminder</button><button data-ics>📅 Add timed nudges to my calendar</button></div>
+      <div class="muted small" style="margin-top:4px">Calendar alarms are the most reliable way to get nudges on your phone even when this app is closed.</div>
+    </div>`;
+}
+function ago(iso) { if (!iso) return "never"; const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; }
+function viewSync() {
+  const s = S.sync; if (!s) return "";
+  const status = s.enabled
+    ? `<span class="chip ${s.lastError ? "yellow" : "green"}">${s.lastError ? "Needs a look" : "On"}</span> <span class="muted small">Last synced ${ago(s.lastSync)}${s.pending ? ` · ${s.pending} change(s) waiting` : ""}</span>`
+    : `<span class="chip purple">Off</span>`;
+  const err = s.lastError ? `<div class="small" style="margin-top:6px">⚠️ ${esc(s.lastError)} <span class="muted">— your data is safe on this device.</span></div>` : "";
+  if (s.mode === "phone") {
+    return `<div class="card"><h2>☁️ Sync with desktop</h2><div>${status}</div>${err}
+      <div class="row" style="margin-top:10px">${s.enabled ? `<button class="primary" data-sync-now>Sync now</button><button data-sync-setup>Change connection</button><button class="ghost" data-sync-off>Disconnect</button>` : `<button class="primary" data-sync-setup>Connect</button>`}</div>
+      <div class="muted small" style="margin-top:6px">Your data lives in a private GitHub Gist only you can access. Your token stays on this phone.</div></div>`;
+  }
+  const link = s.gistId && s.appUrl ? `${s.appUrl}#gist=${s.gistId}` : "";
+  return `<div class="card"><h2>📱 Phone app &amp; sync</h2><div>${status}</div>${err}
+    <div class="row" style="margin-top:10px">${s.enabled ? `<button class="primary" data-sync-now>Sync now</button><button class="ghost" data-sync-off>Turn off</button>` : `<button class="primary" data-sync-on>Turn on sync</button>`}</div>
+    ${link ? `<div class="small" style="margin-top:10px">Open this on your phone, then <b>Share → Add to Home Screen</b>:</div>
+      <div class="row" style="margin-top:4px"><input class="grow" readonly value="${esc(link)}" onclick="this.select()" /><button data-copy="${esc(link)}">Copy</button></div>` : ""}
+  </div>`;
+}
+
+/* ---------- Dialog helper ---------- */
+function form(title, fields, onSubmit, extraBtn) {
+  const f = $("#dlgForm"); const dlg = $("#dlg");
+  f.innerHTML = `<h2 style="margin-top:0">${esc(title)}</h2>${fields.map((x) => {
+    const v = esc(x.value ?? "");
+    if (x.type === "select") return `<label>${esc(x.label)}</label><select name="${x.name}">${Object.entries(x.options).map(([k, l]) => `<option value="${k}" ${k === x.value ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+    if (x.type === "textarea") return `<label>${esc(x.label)}</label><textarea name="${x.name}">${v}</textarea>`;
+    if (x.type === "checkbox") return `<label class="row" style="color:inherit"><input type="checkbox" name="${x.name}" style="width:auto" ${x.value ? "checked" : ""}/> ${esc(x.label)}</label>`;
+    return `<label>${esc(x.label)}</label><input name="${x.name}" type="${x.type || "text"}" value="${v}" placeholder="${esc(x.placeholder || "")}" ${x.attrs || ""}/>`;
+  }).join("")}
+  <div class="row" style="margin-top:16px;justify-content:flex-end">${extraBtn ? `<button type="button" class="ghost" id="dlgExtra" style="margin-right:auto">${esc(extraBtn.label)}</button>` : ""}<button value="cancel" formnovalidate>Cancel</button><button class="primary" value="ok">Save</button></div>`;
+  if (extraBtn) $("#dlgExtra").onclick = () => { dlg.close(); extraBtn.fn(); };
+  dlg.onclose = () => {
+    if (dlg.returnValue !== "ok") return;
+    const out = {}; for (const x of fields) { const el = f.elements[x.name]; out[x.name] = x.type === "checkbox" ? el.checked : el.value.trim(); }
+    onSubmit(out);
+  };
+  dlg.returnValue = ""; dlg.showModal();
+  const first = f.querySelector("input,select,textarea"); if (first) first.focus();
+}
+const interestFields = (i = {}) => [
+  { name: "name", label: "Name", value: i.name, placeholder: "e.g. Watercolor, Birdwatching, Synths" },
+  { name: "emoji", label: "Emoji", value: i.emoji || "🌱" },
+  { name: "status", label: "Season", type: "select", value: i.status || "active", options: { active: "Active — into it right now", simmering: "Simmering — on and off", resting: "Resting — on pause, no guilt" } },
+  { name: "nextStep", label: "Next tiny step (optional)", value: i.nextStep, placeholder: "e.g. Put the sketchbook on the desk" },
+  { name: "notes", label: "Notes, ideas, links", type: "textarea", value: i.notes },
+];
+const growthFields = (g = {}) => [
+  { name: "title", label: "Title", value: g.title, placeholder: "e.g. Intro to UX Design" },
+  { name: "type", label: "Type", type: "select", value: g.type || "course", options: GROWTH_TYPES },
+  { name: "status", label: "Status", type: "select", value: g.status || "exploring", options: Object.fromEntries(Object.entries(GROWTH_STATUS).map(([k, v]) => [k, v[0]])) },
+  { name: "progress", label: "Progress %", type: "number", value: g.progress ?? 0, attrs: 'min="0" max="100"' },
+  { name: "link", label: "Link (optional)", value: g.link, type: "url" },
+  { name: "nextStep", label: "Next tiny step", value: g.nextStep, placeholder: "e.g. Watch lesson 2 (12 min)" },
+  { name: "targetDate", label: "Loose target date (optional)", type: "date", value: g.targetDate },
+  { name: "notes", label: "Notes", type: "textarea", value: g.notes },
+];
+const routineFields = (r = {}) => [
+  { name: "title", label: "Reminder", value: r.title, placeholder: "e.g. Take a stretch break" },
+  { name: "emoji", label: "Emoji", value: r.emoji || "✨" },
+  { name: "part", label: "Part of day", type: "select", value: r.part || "anytime", options: Object.fromEntries(PARTS) },
+  { name: "time", label: "Nudge time (optional)", type: "time", value: r.time || "" },
+  { name: "essential", label: "Essential — show even on low-battery days", type: "checkbox", value: !!r.essential },
+  ...(r.id ? [{ name: "active", label: "Active", type: "checkbox", value: r.active !== false }] : []),
+];
+
+/* ---------- Notifications ---------- */
+const notified = new Set();
+function notify(title, body) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (navigator.serviceWorker?.controller) navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, { body, icon: "icon-192.png", tag: title }));
+    else new Notification(title, { body });
+  } catch {}
+}
+
+/* ---------- Calendar export: real phone alarms for timed reminders ---------- */
+function exportIcs() {
+  const timed = S.routines.filter((r) => r.active && r.time);
+  if (!timed.length) { toast("Give a reminder a nudge time first — then it can go on your calendar."); return; }
+  const d = today().replace(/-/g, "");
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Command Center//EN", "CALSCALE:GREGORIAN"];
+  for (const r of timed) {
+    const t = r.time.replace(":", "") + "00";
+    lines.push("BEGIN:VEVENT", `UID:cc-${r.id}@command-center`, `DTSTAMP:${stamp}`, `DTSTART:${d}T${t}`, "DURATION:PT5M", "RRULE:FREQ=DAILY",
+      `SUMMARY:${r.emoji} ${r.title}`.replace(/[,;]/g, (c) => "\\" + c), "DESCRIPTION:Gentle nudge — whenever you're ready. Skipping is allowed.", "TRANSP:TRANSPARENT",
+      "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${r.emoji} ${r.title}`.replace(/[,;]/g, (c) => "\\" + c), "TRIGGER:PT0M", "END:VALARM", "END:VEVENT");
+  }
+  lines.push("END:VCALENDAR");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/calendar" }));
+  a.download = "command-center-reminders.ics";
+  document.body.appendChild(a); a.click(); a.remove();
+  toast("Open the downloaded file to add your nudges to your calendar. 📅");
+}
+setInterval(() => {
+  if (!S) return;
+  for (const r of dueNudges()) { const k = today() + r.id; if (!notified.has(k)) { notified.add(k); notify(`${r.emoji} ${r.title}`, "Gentle nudge — whenever you're ready."); } }
+  if (tab === "today" && !timer.end && !document.querySelector("dialog[open]") && document.activeElement?.tagName !== "INPUT") render();
+}, 60000);
+
+/* ---------- Events ---------- */
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const ds = b.dataset;
+  if (ds.tab) { tab = ds.tab; sessionStorage.setItem("cc-tab", tab); render(); return; }
+  if (ds.energy) return op("checkin", { energy: ds.energy });
+  if (ds.toggleR) return op("toggleRoutine", { id: ds.toggleR });
+  if (ds.skip) return op("skipRoutine", { id: ds.skip });
+  if (ds.snooze) return op("skipRoutine", { id: ds.snooze, until: new Date(Date.now() + 30 * 60000).toISOString() });
+  if (ds.showall !== undefined) { showAll = !showAll; render(); return; }
+  if (ds.toggleT) return op("toggleTask", { id: ds.toggleT });
+  if (ds.delT) return op("deleteTask", { id: ds.delT });
+  if (ds.step) { const [id, i] = ds.step.split(":"); return op("toggleStep", { id, index: Number(i) }); }
+  if (ds.break) return form("Break it into tiny steps", [{ name: "steps", label: "One step per line — make the first one almost silly-small", type: "textarea", value: "" }], async (v) => {
+    for (const line of v.steps.split("\n").map((s) => s.trim()).filter(Boolean)) await op("addStep", { id: ds.break, text: line });
+  });
+  if (ds.start) { const t = S.tasks.find((x) => x.id === ds.start); timer.end = Date.now() + 2 * 60000; timer.label = t?.title || ""; render(); toast("Just two minutes. You can stop after. ▶"); return; }
+  if (ds.timer) { timer.end = Date.now() + Number(ds.timer) * 60000; timer.label = ""; render(); return; }
+  if (ds.timerStop !== undefined) { timer.end = null; timer.label = ""; clearInterval(timer.handle); render(); toast("Stopped. Any amount of time counts."); return; }
+  if (ds.addInterest !== undefined) return form("Add an interest", interestFields(), (v) => op("addInterest", v));
+  if (ds.editInterest) { const i = S.interests.find((x) => x.id === ds.editInterest); return form("Edit interest", interestFields(i), (v) => op("updateInterest", { id: i.id, ...v }), { label: "Remove", fn: () => op("deleteInterest", { id: i.id }) }); }
+  if (ds.logInterest) { const i = S.interests.find((x) => x.id === ds.logInterest); return form(`Log time: ${i.emoji} ${i.name}`, [{ name: "minutes", label: "Roughly how many minutes? (a guess is fine)", type: "number", value: 30 }, { name: "note", label: "Anything you want to remember?", type: "textarea" }], (v) => op("logInterest", { id: i.id, ...v })); }
+  if (ds.addGrowth !== undefined) return form("Add a growth item", growthFields(), (v) => op("addGrowth", v));
+  if (ds.editGrowth) { const g = S.growth.find((x) => x.id === ds.editGrowth); return form("Edit growth item", growthFields(g), (v) => op("updateGrowth", { id: g.id, ...v }), { label: "Remove", fn: () => op("deleteGrowth", { id: g.id }) }); }
+  if (ds.bump) { const g = S.growth.find((x) => x.id === ds.bump); return op("updateGrowth", { id: g.id, progress: Math.min(100, g.progress + 10), status: g.status === "exploring" ? "in-progress" : g.status }); }
+  if (ds.gdone) return op("updateGrowth", { id: ds.gdone, status: "done" });
+  if (ds.dumpTask) return op("dumpToTask", { id: ds.dumpTask });
+  if (ds.delDump) return op("deleteDump", { id: ds.delDump });
+  if (ds.saveName !== undefined) return op("settings", { name: $("#setName").value.trim() });
+  if (ds.scale) return op("settings", { textScale: Number(ds.scale) });
+  if (ds.notify !== undefined) { try { Notification.requestPermission().then((p) => toast(p === "granted" ? "Nudges on. 🔔" : "No problem — nudges will stay in the app.")); } catch { toast("Pop-ups aren't available here — nudges will stay in the app."); } return; }
+  if (ds.ics !== undefined) return exportIcs();
+  if (ds.syncNow !== undefined) return syncAction({ action: "now" });
+  if (ds.syncOn !== undefined) return syncAction({ action: "enable" });
+  if (ds.syncOff !== undefined) return syncAction({ action: "disable" });
+  if (ds.copy) { navigator.clipboard?.writeText(ds.copy).then(() => toast("Copied. 📋"), () => toast("Select the link and copy it.")); return; }
+  if (ds.syncSetup !== undefined) return form("Connect to your desktop", [
+    { name: "gistId", label: "Sync ID (filled in automatically if you used the link from your desktop)", value: S.sync.gistId || "" },
+    { name: "token", label: "GitHub token (fine-grained, “Gists: read & write” only)", type: "password", value: "", placeholder: S.sync.hasToken ? "Leave blank to keep the saved token" : "github_pat_…" },
+  ], (v) => syncAction({ action: "enable", gistId: v.gistId, token: v.token }));
+  if (ds.addR !== undefined) return form("Add a daily reminder", routineFields(), (v) => op("addRoutine", { ...v, time: v.time || null }));
+  if (ds.editR) { const r = S.routines.find((x) => x.id === ds.editR); return form("Edit reminder", routineFields(r), (v) => op("updateRoutine", { id: r.id, ...v, time: v.time || null }), { label: "Remove", fn: () => op("deleteRoutine", { id: r.id }) }); }
+});
+document.addEventListener("change", (e) => { if (e.target.id === "setLow") op("settings", { lowStim: e.target.checked }); });
+document.addEventListener("submit", (e) => {
+  const f = e.target;
+  if (f.id === "dumpForm") { e.preventDefault(); const v = $("#dumpInput").value.trim(); if (v) { $("#dumpInput").value = ""; op("dump", { text: v }); } }
+  if (f.id === "taskForm") { e.preventDefault(); const t = f.elements.title.value.trim(); if (t) op("addTask", { title: t, date: f.elements.date.value || null }); }
+  if (f.id === "winForm") { e.preventDefault(); const t = f.elements.text.value.trim(); if (t) op("addWin", { text: t }); }
+});
+
+const es = API.subscribe(() => { if (!document.querySelector("dialog[open]")) load(); });
+load();
+</script>
+</body>
+</html>
